@@ -6,7 +6,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import app from './app';
 import { pool } from './db/index';
 
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.PORT || '4000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 

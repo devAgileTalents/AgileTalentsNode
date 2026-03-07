@@ -2,7 +2,8 @@ module.exports = {
   apps: [
     {
       name: 'node-server-agile-talents',
-      script: './dist/server.js',
+      cwd: '/var/www/AgileTalentsNode',
+      script: 'dist/server.js',
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
@@ -10,6 +11,7 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
+        PORT: 4000,
       },
       error_file: './logs/err.log',
       out_file: './logs/out.log',

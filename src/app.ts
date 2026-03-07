@@ -78,7 +78,7 @@ app.use(generalLimiter);
 ─────────────────────────────────────────────── */
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:3000', 'http://217.154.83.75:3000'];
+  : ['http://localhost:4000', 'http://217.154.83.75:4000'];
 
 app.use(
   cors({
