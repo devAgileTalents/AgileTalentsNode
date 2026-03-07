@@ -1,0 +1,36 @@
+name: Deploy Node Server to VPS
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+
+            cd /var/www/AgileTalentsNode
+
+            git fetch origin
+            git reset --hard origin/master
+            git clean -fd
+
+            rm -rf .dist
+
+            npm install
+            npm run build
+
+            mkdir -p logs
+
+            pm2 startOrRestart ecosystem.config.js --only node-server-agile-talents
+            pm2 save
