@@ -31,3 +31,15 @@ export type BlogArticleDB = {
   publish_date: Date;
   created_at?: Date;
 };
+
+export type SqlParam =
+  | string
+  | number
+  | boolean
+  | Date
+  | null
+  | undefined
+  | string[]
+  | number[]
+  | boolean[]
+  | Date[];

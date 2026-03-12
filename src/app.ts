@@ -112,7 +112,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 ─────────────────────────────────────────────── */
 app.use((req, res, next) => {
   if (req.path.startsWith('/uploads')) return next();
-  if (req.path.startsWith('/api')) return next();
+  if (req.path.startsWith('/')) return next();
 
   const suspiciousPatterns = [
     /\.env/i,
@@ -188,7 +188,7 @@ app.get('/health', (req, res) => {
 /* ───────────────────────────────────────────────
   API routes
 ─────────────────────────────────────────────── */
-app.use('/api', apiLimiter, publicRoutes);
+app.use('/', apiLimiter, publicRoutes);
 
 /* ───────────────────────────────────────────────
   404 handler

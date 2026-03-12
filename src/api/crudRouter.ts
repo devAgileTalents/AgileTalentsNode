@@ -60,7 +60,8 @@ export function createCrudRouter<T>(repo: CrudRepo<T>, options: CrudRouterOption
           totalPages: Math.ceil(result.total / limit),
         },
       });
-    } catch {
+    } catch (error) {
+      console.error('LIST route error:', error);
       res.status(500).json({ error: 'Failed to fetch data' });
     }
   });

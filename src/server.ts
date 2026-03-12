@@ -21,8 +21,8 @@ const startServer = async () => {
       console.log('═══════════════════════════════════════════════════════');
       console.log(`🚀 Server running in ${NODE_ENV} mode`);
       console.log(`📡 Local:    http://localhost:${PORT}`);
-      console.log(`🔗 API:      http://217.154.83.75:${PORT}/api`);
-      console.log(`❤️  Health:  http://217.154.83.75:${PORT}/health`);
+      console.log(`🔗 API:      http://api.agiletalents.io`);
+      console.log(`❤️ Health:  http://api.agiletalents.io/health`);
       console.log('═══════════════════════════════════════════════════════');
     });
 

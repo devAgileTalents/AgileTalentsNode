@@ -24,7 +24,6 @@ import {
   deleteBlogArticle,
 } from '../db/repositories/blog-articles';
 import { createCrudRouter } from '../api/crudRouter';
-import { createNewTable } from '../db/repositories/new-table';
 import authAdminRoutes from './auth.admin.routes';
 import authHubRoutes from './auth.hub.routes';
 
@@ -103,16 +102,5 @@ router.use(
     },
   ),
 );
-
-router.post('/new-table', async (req, res) => {
-  try {
-    const { tableName, columns } = req.body;
-    const result = await createNewTable({ tableName, columns });
-    res.status(201).json({ ok: true, tableName: result.tableName });
-  } catch (e: any) {
-    const status = e?.status || 500;
-    res.status(status).json({ error: e?.message || 'Failed to create table' });
-  }
-});
 
 export default router;
