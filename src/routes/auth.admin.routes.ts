@@ -9,7 +9,7 @@ const router = Router();
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || '';
 const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '';
-const ADMIN_SESSION_SECRET = process.env.SESSION_SECRET || '';
+const ADMIN_SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || '';
 const ADMIN_COOKIE_NAME = 'admin_session';
 
 type AdminLoginBody = {
