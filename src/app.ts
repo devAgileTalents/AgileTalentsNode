@@ -46,9 +46,24 @@ const SUSPICIOUS_PATTERNS = [
 /* ───────────────────────────────────────────────
   Rate limiters
 ─────────────────────────────────────────────── */
+const DEV_IPS = process.env.DEV_IPS!;
+
+function normalizeIp(ip?: string) {
+  if (!ip) return '';
+  return ip.replace('::ffff:', '').trim();
+}
+
+function isDevIp(req: express.Request) {
+  const ip = normalizeIp(req.ip);
+  return DEV_IPS.includes(ip);
+}
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: (req) => {
+    if (isDevIp(req)) return 5000;
+    return 100;
+  },
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => req.path === '/health' || req.path.startsWith('/uploads'),
@@ -60,13 +75,22 @@ const generalLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 50,
-  message: { error: 'Too Many Requests', message: 'Too many API requests, please slow down.' },
+  max: (req) => {
+    if (isDevIp(req)) return 2000;
+    return 50;
+  },
+  message: {
+    error: 'Too Many Requests',
+    message: 'Too many API requests, please slow down.',
+  },
 });
 
 const suspiciousLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  max: (req) => {
+    if (isDevIp(req)) return 100;
+    return 5;
+  },
   message: {
     error: 'Suspicious Activity Detected',
     message: 'Your request has been blocked due to suspicious activity.',
