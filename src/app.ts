@@ -58,40 +58,38 @@ function isDevIp(req: express.Request) {
   return DEV_IPS.includes(ip);
 }
 
-/** Hub frontend (Next.js) makes server-side requests to this API.
- *  These come from localhost / the server's own IP, not the end user.
- *  We identify them by the x-forwarded-host header set in the Hub proxy,
- *  or by being a local IP hitting /hub/* routes. */
-function isHubServerRequest(req: express.Request) {
+function shouldSkipRateLimit(req: express.Request) {
+  // Allow disabling rate limiting entirely via env (for development)
+  if (process.env.DISABLE_RATE_LIMIT === 'true') return true;
+
+  // Hub routes are protected by requireHubAuth (cookie auth).
+  // nginx may strip /hub prefix, so check multiple path patterns.
+  if (req.path.startsWith('/hub/')) return true;
+  if (req.path.startsWith('/auth/') || req.path.startsWith('/data/')) return true;
+
   // Hub proxy sets this header
   if (req.get('x-forwarded-host') === 'api.agiletalents.io') return true;
 
-  // Local server-to-server calls
+  // Authenticated hub user
+  if (req.cookies?.hub_session) return true;
+
+  // Dev whitelist
+  if (isDevIp(req)) return true;
+
+  // Local server-to-server
   const ip = normalizeIp(req.ip);
-  const localIps = ['127.0.0.1', '::1', 'localhost'];
-  if (localIps.includes(ip) && req.path.startsWith('/hub/')) return true;
+  if (['127.0.0.1', '::1', 'localhost'].includes(ip)) return true;
 
   return false;
 }
 
-function shouldSkipRateLimit(req: express.Request) {
-  // Hub routes are already protected by requireHubAuth (cookie auth).
-  // Skip rate limiting for them — especially important during development
-  // when Hub frontend proxies all requests through Next.js server.
-  if (req.path.startsWith('/hub/')) return true;
-
-  return isDevIp(req) || isHubServerRequest(req);
-}
-
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: (req) => {
-    if (shouldSkipRateLimit(req)) return 0; // 0 = unlimited
-    return 100;
-  },
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path === '/health' || req.path.startsWith('/uploads'),
+  skip: (req) =>
+    req.path === '/health' || req.path.startsWith('/uploads') || shouldSkipRateLimit(req),
   message: {
     error: 'Too Many Requests',
     message: 'Too many requests from this IP, please try again later.',
@@ -100,10 +98,8 @@ const generalLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: (req) => {
-    if (shouldSkipRateLimit(req)) return 0;
-    return 50;
-  },
+  max: 200,
+  skip: (req) => shouldSkipRateLimit(req),
   message: {
     error: 'Too Many Requests',
     message: 'Too many API requests, please slow down.',
@@ -112,10 +108,8 @@ const apiLimiter = rateLimit({
 
 const suspiciousLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: (req) => {
-    if (shouldSkipRateLimit(req)) return 0;
-    return 5;
-  },
+  max: 5,
+  skip: (req) => shouldSkipRateLimit(req),
   message: {
     error: 'Suspicious Activity Detected',
     message: 'Your request has been blocked due to suspicious activity.',
