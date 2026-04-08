@@ -26,10 +26,12 @@ import {
 import { createCrudRouter } from '../api/crudRouter';
 import authAdminRoutes from './auth.admin.routes';
 import authHubRoutes from './auth.hub.routes';
+import hubDataRoutes from './hub.data.routes';
 
 const router = Router();
 router.use('/admin/auth', authAdminRoutes);
 router.use('/hub/auth', authHubRoutes);
+router.use('/hub/data', hubDataRoutes);
 
 router.use(
   '/freelancers',
