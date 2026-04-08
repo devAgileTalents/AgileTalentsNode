@@ -41,6 +41,7 @@ export type HubUserDB = {
   title: string;
   company: string | null;
   hourly_rate: number | null;
+  password_hash: string | null;
   role: string;
   email: string;
   invoice_email: string | null;

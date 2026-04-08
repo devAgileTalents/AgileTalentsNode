@@ -1,14 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
-import { HubUser } from '../types/types';
 import { handleRouteError } from '../lib/errors/route-error';
 import { getIsHttps } from '../lib/http/cookie';
 import { buildHubToken, verifyHubToken } from '../lib/auth/hub-session';
+import { pool } from '../db/index';
+import { HubUserDB } from '../types/db.types';
 
 const router = Router();
 
-const HUB_USERS_JSON = process.env.HUB_USERS_JSON || '[]';
 const HUB_SESSION_SECRET = process.env.HUB_SESSION_SECRET || '';
 const HUB_COOKIE_NAME = 'hub_session';
 
@@ -17,19 +17,9 @@ type LoginBody = {
   password?: string;
 };
 
-function parseUsers(): HubUser[] {
-  try {
-    const parsed = JSON.parse(HUB_USERS_JSON);
-    return Array.isArray(parsed) ? (parsed as HubUser[]) : [];
-  } catch (error) {
-    console.error('parseUsers error:', error);
-    return [];
-  }
-}
-
-function getPublicHubUser(user: HubUser) {
+function getPublicHubUser(user: HubUserDB) {
   return {
-    id: user.id,
+    id: String(user.id),
     email: user.email,
     photo: user.photo ?? null,
     name: user.name,
@@ -84,10 +74,14 @@ router.post('/login', loginLimiter, async (req: Request<{}, {}, LoginBody>, res:
       });
     }
 
-    const users = parseUsers();
     const normalizedEmail = email.trim().toLowerCase();
 
-    const user = users.find((u) => u.email.trim().toLowerCase() === normalizedEmail);
+    const result = await pool.query<HubUserDB>(
+      'SELECT * FROM hub_users WHERE LOWER(email) = $1 LIMIT 1',
+      [normalizedEmail],
+    );
+
+    const user = result.rows[0];
 
     if (!user) {
       return res.status(401).json({
@@ -96,7 +90,14 @@ router.post('/login', loginLimiter, async (req: Request<{}, {}, LoginBody>, res:
       });
     }
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!user.password_hash) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Password not set for this user',
+      });
+    }
+
+    const ok = await bcrypt.compare(password, user.password_hash);
 
     if (!ok) {
       return res.status(401).json({
@@ -107,7 +108,7 @@ router.post('/login', loginLimiter, async (req: Request<{}, {}, LoginBody>, res:
 
     const ttlMs = 24 * 60 * 60 * 1000;
     const expMs = Date.now() + ttlMs;
-    const token = buildHubToken(user.id, expMs, HUB_SESSION_SECRET);
+    const token = buildHubToken(String(user.id), expMs, HUB_SESSION_SECRET);
     const isHttps = getIsHttps(req);
 
     res.cookie(HUB_COOKIE_NAME, token, {
@@ -143,7 +144,7 @@ router.post('/logout', (req: Request, res: Response) => {
   }
 });
 
-router.get('/me', (req: Request, res: Response) => {
+router.get('/me', async (req: Request, res: Response) => {
   try {
     const parsed = verifyHubToken(req.cookies?.[HUB_COOKIE_NAME], HUB_SESSION_SECRET);
 
@@ -151,8 +152,12 @@ router.get('/me', (req: Request, res: Response) => {
       return res.status(401).json({ ok: false });
     }
 
-    const users = parseUsers();
-    const user = users.find((u) => u.id === parsed.userId);
+    const result = await pool.query<HubUserDB>(
+      'SELECT * FROM hub_users WHERE id = $1 LIMIT 1',
+      [Number(parsed.userId)],
+    );
+
+    const user = result.rows[0];
 
     if (!user) {
       return res.status(401).json({ ok: false });

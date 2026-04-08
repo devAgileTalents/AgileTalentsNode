@@ -46,7 +46,7 @@ const SUSPICIOUS_PATTERNS = [
 /* ───────────────────────────────────────────────
   Rate limiters
 ─────────────────────────────────────────────── */
-const DEV_IPS = process.env.DEV_IPS!;
+const DEV_IPS = process.env.DEV_IPS || '';
 
 function normalizeIp(ip?: string) {
   if (!ip) return '';
@@ -58,10 +58,35 @@ function isDevIp(req: express.Request) {
   return DEV_IPS.includes(ip);
 }
 
+/** Hub frontend (Next.js) makes server-side requests to this API.
+ *  These come from localhost / the server's own IP, not the end user.
+ *  We identify them by the x-forwarded-host header set in the Hub proxy,
+ *  or by being a local IP hitting /hub/* routes. */
+function isHubServerRequest(req: express.Request) {
+  // Hub proxy sets this header
+  if (req.get('x-forwarded-host') === 'api.agiletalents.io') return true;
+
+  // Local server-to-server calls
+  const ip = normalizeIp(req.ip);
+  const localIps = ['127.0.0.1', '::1', 'localhost'];
+  if (localIps.includes(ip) && req.path.startsWith('/hub/')) return true;
+
+  return false;
+}
+
+function shouldSkipRateLimit(req: express.Request) {
+  // Hub routes are already protected by requireHubAuth (cookie auth).
+  // Skip rate limiting for them — especially important during development
+  // when Hub frontend proxies all requests through Next.js server.
+  if (req.path.startsWith('/hub/')) return true;
+
+  return isDevIp(req) || isHubServerRequest(req);
+}
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: (req) => {
-    if (isDevIp(req)) return 5000;
+    if (shouldSkipRateLimit(req)) return 0; // 0 = unlimited
     return 100;
   },
   standardHeaders: true,
@@ -76,7 +101,7 @@ const generalLimiter = rateLimit({
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: (req) => {
-    if (isDevIp(req)) return 2000;
+    if (shouldSkipRateLimit(req)) return 0;
     return 50;
   },
   message: {
@@ -88,7 +113,7 @@ const apiLimiter = rateLimit({
 const suspiciousLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: (req) => {
-    if (isDevIp(req)) return 100;
+    if (shouldSkipRateLimit(req)) return 0;
     return 5;
   },
   message: {
