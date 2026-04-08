@@ -111,6 +111,13 @@ router.post('/login', loginLimiter, async (req: Request<{}, {}, LoginBody>, res:
     const token = buildHubToken(String(user.id), expMs, HUB_SESSION_SECRET);
     const isHttps = getIsHttps(req);
 
+    // On login: update last_seen, and activate Invited users
+    const newStatus = user.status === 'Invited' ? 'Active' : user.status;
+    await pool.query(
+      'UPDATE hub_users SET last_seen = NOW(), status = $1 WHERE id = $2',
+      [newStatus, user.id],
+    );
+
     res.cookie(HUB_COOKIE_NAME, token, {
       httpOnly: true,
       path: '/',
@@ -152,9 +159,25 @@ router.get('/me', async (req: Request, res: Response) => {
       return res.status(401).json({ ok: false });
     }
 
+    const userId = Number(parsed.userId);
+
+    // Refresh last_seen on every /me call.
+    // If status is Active or Last been — set Active (user is online now).
+    // Admin-set statuses (Invited, Disabled, Archived) are not changed.
+    await pool.query(
+      `UPDATE hub_users
+       SET last_seen = NOW(),
+           status = CASE
+             WHEN status IN ('Active', 'Last been') THEN 'Active'
+             ELSE status
+           END
+       WHERE id = $1`,
+      [userId],
+    );
+
     const result = await pool.query<HubUserDB>(
       'SELECT * FROM hub_users WHERE id = $1 LIMIT 1',
-      [Number(parsed.userId)],
+      [userId],
     );
 
     const user = result.rows[0];
